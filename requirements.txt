@@ -1,0 +1,22 @@
+# Tính toán & dữ liệu
+numpy
+pandas
+scikit-learn
+
+# Xử lý ảnh
+opencv-python
+pillow
+albumentations
+
+# Trực quan hóa & theo dõi huấn luyện
+matplotlib
+tensorboard
+tqdm
+
+# Hỗ trợ xây dựng mô hình tự thiết kế
+torchinfo        
+grad-cam       
+
+# Làm việc tương tác
+jupyterlab
+ipykernel
