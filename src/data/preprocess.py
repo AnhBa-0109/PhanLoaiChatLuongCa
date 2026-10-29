@@ -1,8 +1,5 @@
-
-
 import cv2
 import numpy as np
-
 
 def resize_max(img, max_side):
     h, w = img.shape[:2]
