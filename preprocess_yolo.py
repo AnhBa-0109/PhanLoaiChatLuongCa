@@ -1,4 +1,3 @@
-
 import argparse
 import csv
 import random
@@ -6,7 +5,6 @@ import re
 import sys
 from collections import defaultdict
 from pathlib import Path
-
 import cv2
 import numpy as np
 from tqdm import tqdm
