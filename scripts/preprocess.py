@@ -1,4 +1,3 @@
-
 import argparse
 import csv
 import random
@@ -10,7 +9,7 @@ import numpy as np
 from tqdm import tqdm
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
-from src.data.preprocess import preprocess  # noqa: E402
+from src.data.preprocess import preprocess  
 
 
 def overlay(bgr, mask):
