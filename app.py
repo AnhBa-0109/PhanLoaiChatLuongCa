@@ -1,7 +1,8 @@
-"""TunaNet web server. Run: python app.py --model outputs/runs/<name>/best.pt"""
+"""TunaNet web server with YOLO + OpenCV preprocessing. Run: python app.py"""
 import argparse
 import base64
 import io
+import logging
 import os
 from pathlib import Path
 import threading
@@ -18,17 +19,25 @@ from werkzeug.exceptions import RequestEntityTooLarge
 from scripts.predict import load_model, predict_one
 
 ROOT = Path(__file__).resolve().parent
+DEFAULT_MODEL = 'outputs/runs/tunanet/best.pt'
+DEFAULT_YOLO = 'outputs/yolo/seg_meat1/weights/best.pt'
 MAX_FILE = 10 * 1024 * 1024
 MAX_PIXELS = 20_000_000
 
 
 class Predictor:
-    def __init__(self, model_path):
+    def __init__(self, model_path, yolo_path=None):
         self.path = Path(model_path)
         if not self.path.is_absolute():
             self.path = ROOT / self.path
         self.device = 'cuda' if torch.cuda.is_available() else 'cpu'
         self.model = None
+        self.yolo = None
+        self.yolo_path = None
+        if yolo_path:
+            self.yolo_path = Path(yolo_path)
+            if not self.yolo_path.is_absolute():
+                self.yolo_path = ROOT / self.yolo_path
         self.classes = []
         self.error = None
         self.lock = threading.Lock()
@@ -36,18 +45,45 @@ class Predictor:
             try:
                 self.model, self.classes, self.size = load_model(self.path, self.device)
             except Exception:
+                logging.getLogger(__name__).exception('Cannot load TunaNet: %s', self.path)
                 self.error = 'Không thể nạp checkpoint. Kiểm tra file trọng số và khởi động lại server.'
         else:
             self.error = 'Chưa có trọng số mô hình. Thêm best.pt rồi khởi động server với --model đường_dẫn/best.pt.'
+        if self.model is not None and self.yolo_path is not None:
+            if not self.yolo_path.is_file():
+                self.error = 'Không thấy checkpoint YOLO. Kiểm tra đường dẫn --yolo rồi khởi động lại server.'
+            else:
+                try:
+                    from ultralytics import YOLO
+                    yolo = YOLO(str(self.yolo_path))
+                    if yolo.task != 'segment':
+                        raise ValueError('YOLO checkpoint must be a segmentation model')
+                    self.yolo = yolo.to(self.device)
+                except Exception:
+                    logging.getLogger(__name__).exception('Cannot load YOLO: %s', self.yolo_path)
+                    self.error = 'Không thể nạp YOLO-seg. Kiểm tra checkpoint, thư viện ultralytics và log server.'
 
     def status(self):
-        return {'ready': self.model is not None, 'message': self.error,
+        return {'ready': self.model is not None and (self.yolo_path is None or self.yolo is not None), 'message': self.error,
                 'device': self.device.upper(), 'classes': self.classes,
-                'model': self.path.name}
+                'model': self.path.name,
+                'pipeline': 'YOLO + OpenCV + TunaNet' if self.yolo_path is not None else 'OpenCV + TunaNet',
+                'yolo_model': self.yolo_path.name if self.yolo_path is not None else None}
 
     def predict(self, bgr):
+        mask_src, yolo_conf = 'opencv', None
         with self.lock:
-            prob, box, crop, mask, ratio = predict_one(self.model, bgr, self.size, self.device)
+            if self.yolo_path is not None:
+                if self.yolo is None:
+                    raise RuntimeError('YOLO is not ready')
+                from scripts.predict_full import run_pipeline
+                result = run_pipeline(bgr, self.yolo, self.model, self.size, self.device)
+                prob, box = result['prob'], result['box']
+                crop, mask = result['crop'], result['mcrop']
+                ratio = float((mask > 0).mean())
+                mask_src, yolo_conf = result['mask_src'], result['yolo_conf']
+            else:
+                prob, box, crop, mask, ratio = predict_one(self.model, bgr, self.size, self.device)
         if not np.isfinite(prob).all():
             raise ValueError('Model returned non-finite probabilities')
         contours, _ = cv2.findContours(mask, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
@@ -57,12 +93,17 @@ class Predictor:
         if not ok:
             raise ValueError('Cannot encode preview')
         k = int(prob.argmax())
+        notices = []
+        if mask_src == 'opencv_fallback':
+            notices.append('YOLO không tìm thấy vùng thịt; đã dùng OpenCV dự phòng. Hãy kiểm tra vùng viền.')
+        if ratio < 0.15 or ratio > 0.97:
+            notices.append('Vùng thịt nhận diện bất thường. Hãy kiểm tra ảnh và vùng viền được đánh dấu.')
         return {'prediction': self.classes[k], 'confidence': float(prob[k]),
                 'probabilities': [{'label': c, 'probability': float(p)} for c, p in zip(self.classes, prob)],
                 'meat_ratio': ratio, 'box': box,
+                'mask_src': mask_src, 'yolo_conf': yolo_conf,
                 'processed_image': 'data:image/jpeg;base64,' + base64.b64encode(encoded).decode('ascii'),
-                'warning': ('Vùng thịt nhận diện bất thường. Hãy kiểm tra ảnh và vùng viền được đánh dấu.'
-                            if ratio < 0.15 or ratio > 0.97 else None)}
+                'warning': ' '.join(notices) or None}
 
 
 def decode_image(raw):
@@ -81,7 +122,7 @@ def decode_image(raw):
         raise ValueError('Không đọc được ảnh. Hãy chọn một file ảnh hợp lệ, không bị hỏng.') from exc
 
 
-def create_app(model_path=None, predictor=None):
+def create_app(model_path=None, predictor=None, yolo_path=None):
     app = Flask(__name__, template_folder='web/templates', static_folder='web/static')
     # Waitress does not enable Flask's debug template reloader by default.
     # Recheck HTML on each request so a running server cannot mix old HTML
@@ -89,7 +130,8 @@ def create_app(model_path=None, predictor=None):
     app.config['TEMPLATES_AUTO_RELOAD'] = True
     app.config['MAX_CONTENT_LENGTH'] = MAX_FILE + 1024 * 1024
     service = predictor if predictor is not None else Predictor(
-        model_path or os.environ.get('TUNANET_MODEL', 'outputs/runs/wb_on_rev/best.pt'))
+        model_path or os.environ.get('TUNANET_MODEL', DEFAULT_MODEL),
+        yolo_path=yolo_path if yolo_path is not None else os.environ.get('TUNANET_YOLO', DEFAULT_YOLO))
     app.extensions['predictor'] = service
 
     @app.get('/')
@@ -140,15 +182,20 @@ def create_app(model_path=None, predictor=None):
 
 if __name__ == '__main__':
     parser = argparse.ArgumentParser(description='TunaNet web application')
-    parser.add_argument('--model', default=os.environ.get('TUNANET_MODEL', 'outputs/runs/wb_on_rev/best.pt'))
+    parser.add_argument('--model', default=os.environ.get('TUNANET_MODEL', DEFAULT_MODEL))
+    parser.add_argument('--yolo', default=os.environ.get('TUNANET_YOLO', DEFAULT_YOLO),
+                        help='Checkpoint YOLO-seg đã dùng để tạo processed_yolo')
     parser.add_argument('--host', default='127.0.0.1')
     parser.add_argument('--port', type=int, default=8000)
     args = parser.parse_args()
     torch.set_num_threads(8)
     from waitress import serve
-    application = create_app(args.model)
+    application = create_app(args.model, yolo_path=args.yolo)
     print(f'TunaNet: http://{args.host}:{args.port}', flush=True)
     state = application.extensions['predictor'].status()
     print(f"Model ready: {state['ready']} | Device: {state['device']}", flush=True)
+    print(f"Pipeline: {state['pipeline']}", flush=True)
+    if state['message']:
+        print(state['message'], flush=True)
     serve(application, host=args.host, port=args.port, threads=4,
           max_request_body_size=MAX_FILE + 2 * 1024 * 1024)

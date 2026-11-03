@@ -12,7 +12,7 @@ from tqdm import tqdm
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 from src.data.preprocess import make_mask, resize_max, white_balance  
 
-DEFAULT_MODEL = "runs/segment/outputs/yolo/seg_meat1/weights/best.pt"
+DEFAULT_MODEL = "outputs/yolo/seg_meat1/weights/best.pt"
 
 
 def imread(p):
@@ -63,7 +63,8 @@ def yolo_mask(model, bgr, conf):
 def crop_box(mask, margin):
     ys, xs = np.nonzero(mask)
     H, W = mask.shape
-    x1, x2, y1, y2 = xs.min(), xs.max(), ys.min(), ys.max()
+    # Native Python ints keep the coordinates JSON-serializable for the web API.
+    x1, x2, y1, y2 = int(xs.min()), int(xs.max()), int(ys.min()), int(ys.max())
     mx, my = int((x2 - x1) * margin), int((y2 - y1) * margin)
     return max(0, x1 - mx), max(0, y1 - my), min(W, x2 + mx + 1), min(H, y2 + my + 1)
 

@@ -10,7 +10,7 @@ import torch
 ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT))
 sys.path.insert(0, str(ROOT / "scripts"))
-from preprocess_yolo import crop_box, yolo_mask  
+from scripts.preprocess_yolo import crop_box, yolo_mask
 from src.data.preprocess import make_mask, resize_max, white_balance  
 from src.models.tunanet import TunaNet  
 
@@ -56,6 +56,8 @@ def run_pipeline(bgr, yolo, tunanet, image_size, device, conf=0.25, margin=0.15,
     src = "yolo"
     if mask_full is None:                      
         mask_full, src = make_mask(bgr), "opencv_fallback"
+    if not np.any(mask_full):
+        raise ValueError('Không tìm thấy vùng thịt trong ảnh')
     t["yolo"] = time.perf_counter() - t0
 
     
@@ -119,8 +121,8 @@ def draw(bgr, res, classes):
 def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("--input", required=True, help="1 ảnh hoặc 1 thư mục ảnh")
-    ap.add_argument("--yolo", default="runs/segment/outputs/yolo/seg_meat1/weights/best.pt")
-    ap.add_argument("--model", default="outputs/runs/yolo_s2/best.pt", help="trọng số TunaNet")
+    ap.add_argument("--yolo", default="outputs/yolo/seg_meat1/weights/best.pt")
+    ap.add_argument("--model", default="outputs/runs/tunanet/best.pt", help="trọng số TunaNet")
     ap.add_argument("--out", default="outputs/predictions_full")
     ap.add_argument("--conf", type=float, default=0.25)
     args = ap.parse_args()
