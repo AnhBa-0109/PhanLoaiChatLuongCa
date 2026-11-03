@@ -12,6 +12,7 @@ class MaskedGAP(nn.Module):
         return num / den
 
 def make_stage(in_ch, out_ch, n_blocks, stride, use_se=True):
+    layers = [ResidualBlock(in_ch, out_ch, stride, use_se)]
     for _ in range(n_blocks - 1):
         layers.append(ResidualBlock(out_ch, out_ch, 1, use_se))
     return nn.Sequential(*layers)

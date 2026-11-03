@@ -55,7 +55,7 @@ def save_confusion(cm, classes, path, title):
 
 def main():
     ap = argparse.ArgumentParser()
-    ap.add_argument("--processed", default="data/processed/processed.csv")
+    ap.add_argument("--processed", default="data/processed_yolo/processed.csv")
     ap.add_argument("--split", default="data/splits/split.csv")
     ap.add_argument("--name", default="tunanet")
     ap.add_argument("--epochs", type=int, default=40)
