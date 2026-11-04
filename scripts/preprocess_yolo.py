@@ -12,7 +12,7 @@ from tqdm import tqdm
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 from src.data.preprocess import make_mask, resize_max, white_balance  
 
-DEFAULT_MODEL = "outputs/yolo/seg_meat1/weights/best.pt"
+DEFAULT_MODEL = "runs/segment/outputs/yolo/seg_meat1/weights/best.pt"
 
 
 def imread(p):

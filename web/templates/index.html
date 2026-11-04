@@ -10,13 +10,14 @@
 <body>
   <aside class="sidebar" aria-label="Thanh điều hướng">
     <a class="brand" href="/">TunaNet</a>
-    <nav aria-label="Chức năng"><a class="nav-active" href="/" aria-current="page"><span aria-hidden="true">▣</span> Phân tích ảnh</a></nav>
-    <div class="future"><h2>Mở rộng</h2><button disabled>Lịch sử <small>Dự kiến</small></button><button disabled>Dữ liệu <small>Dự kiến</small></button><button disabled>Cấu hình <small>Dự kiến</small></button></div>
+    <nav aria-label="Chức năng"><a id="nav-analyze" class="nav-active" href="/" aria-current="page"><span aria-hidden="true">▣</span> Phân tích ảnh</a></nav>
+    <div class="future"><h2>Mở rộng</h2><button disabled>Lịch sử <small>Dự kiến</small></button><button id="nav-data" type="button">Dữ liệu</button><button id="nav-settings" type="button">Cấu hình</button></div>
     <p class="sidebar-foot">Phân loại chất lượng cá ngừ</p>
   </aside>
   <main>
     <header class="topbar"><span>Không gian làm việc</span><span id="connection" class="status" role="status"><i></i> Đang kết nối</span></header>
     <div class="content">
+      <div id="analyze-view">
       <div class="page-title"><div><h1>Phân tích ảnh</h1><p>Tải ảnh mặt cắt đuôi cá ngừ để nhận kết quả phân loại.</p></div><button id="reset" class="secondary" type="button">↺ Làm mới</button></div>
       <div id="model-notice" class="notice" role="status" hidden></div>
       <div class="work-area">
@@ -40,14 +41,39 @@
           <div id="result-content" hidden>
             <div class="prediction"><div><span>Cấp chất lượng dự đoán</span><h3 id="prediction"></h3></div><div class="confidence"><span>Xác suất mô hình</span><strong id="confidence"></strong></div></div>
             <table class="probability-table"><caption>Xác suất từng cấp</caption><thead><tr><th scope="col">Cấp chất lượng</th><th scope="col">Xác suất</th></tr></thead><tbody id="probabilities"></tbody></table>
-            <dl class="metrics"><div><dt>Thời gian xử lý</dt><dd id="elapsed"></dd></div><div><dt>Tỉ lệ vùng thịt</dt><dd id="meat-ratio"></dd></div></dl>
+            <dl class="metrics"><div><dt>Phương án</dt><dd id="method-used"></dd></div><div><dt>Thời gian xử lý</dt><dd id="elapsed"></dd></div><div id="timing-row" hidden><dt>Từng bước</dt><dd id="timings"></dd></div><div><dt>Tỉ lệ vùng thịt</dt><dd id="meat-ratio"></dd></div></dl>
             <details class="processed"><summary>Xem vùng thịt được nhận diện</summary><img id="processed-image" alt="Vùng thịt sau cân bằng trắng, có đường viền mask"></details>
             <p id="warning" class="notice" hidden></p><p class="result-note">Xác suất thể hiện mức ưu tiên của mô hình, không phải độ chính xác đã được kiểm chứng cho ảnh này.</p>
           </div>
         </section>
       </div>
+      <section id="stages" class="stages" aria-labelledby="stages-heading" hidden>
+        <details id="stages-toggle" open>
+          <summary><h2 id="stages-heading">Các giai đoạn xử lý</h2><span id="stages-method"></span><span id="stages-hint" class="stages-hint"></span></summary>
+          <ol id="stage-list" class="stage-list"></ol>
+        </details>
+      </section>
+      </div>
+      <section id="data-view" aria-labelledby="data-heading" hidden>
+        <div class="page-title"><div><h1 id="data-heading">Dữ liệu và kết quả thực nghiệm</h1><p>Số liệu được đọc trực tiếp từ các file kết quả huấn luyện trên tập kiểm thử.</p></div></div>
+        <div id="data-notice" class="notice" role="status" hidden></div>
+        <div id="data-content"></div>
+      </section>
+      <section id="settings-view" aria-labelledby="settings-heading" hidden>
+        <div class="page-title"><div><h1 id="settings-heading">Cấu hình</h1><p>Chọn phương án tách vùng thịt dùng khi phân tích ảnh.</p></div></div>
+        <fieldset class="method-list">
+          <legend>Phương án tách vùng thịt</legend>
+          <label class="method-card"><input type="radio" name="method" value="yolo" checked><span><strong>YOLO-seg</strong><small>Mô hình YOLO-seg tự tìm miếng thịt, sau đó OpenCV chuẩn hóa ảnh.</small><em id="status-yolo">Đang kiểm tra</em></span></label>
+          <label class="method-card"><input type="radio" name="method" value="threshold"><span><strong>Ngưỡng màu</strong><small>Tách thịt theo màu sắc bằng OpenCV, không dùng YOLO-seg.</small><em id="status-threshold">Đang kiểm tra</em></span></label>
+        </fieldset>
+        <p class="result-note">Mỗi phương án dùng một mô hình TunaNet riêng, được huấn luyện đúng với cách xử lý ảnh của phương án đó.</p>
+      </section>
       <footer>Chụp rõ một miếng thịt trên nền sáng, không dùng bộ lọc màu. Kết quả cần được đối chiếu với đánh giá thực tế.</footer>
     </div>
   </main>
+  <dialog id="zoom" class="zoom" aria-labelledby="zoom-title">
+    <div class="zoom-bar"><strong id="zoom-title"></strong><div><button id="zoom-prev" class="secondary" type="button">‹ Trước</button><button id="zoom-next" class="secondary" type="button">Sau ›</button><button id="zoom-close" class="secondary" type="button">✕ Đóng</button></div></div>
+    <img id="zoom-image" alt="">
+  </dialog>
 </body>
 </html>

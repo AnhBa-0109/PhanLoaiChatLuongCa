@@ -82,7 +82,7 @@ def run_pipeline(bgr, yolo, tunanet, image_size, device, conf=0.25, margin=0.15,
     t["tunanet"] = time.perf_counter() - t0
 
     return {"prob": prob, "mask_full": mask_full, "box": (x1, y1, x2, y2), "crop": crop, "mcrop": mcrop,
-            "mask_src": src, "yolo_conf": yconf, "time": t}
+            "mask_src": src, "yolo_conf": yconf, "time": t, "wide_wb": wide}
 
 
 def draw(bgr, res, classes):
@@ -121,8 +121,8 @@ def draw(bgr, res, classes):
 def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("--input", required=True, help="1 ảnh hoặc 1 thư mục ảnh")
-    ap.add_argument("--yolo", default="outputs/yolo/seg_meat1/weights/best.pt")
-    ap.add_argument("--model", default="outputs/runs/tunanet/best.pt", help="trọng số TunaNet")
+    ap.add_argument("--yolo", default="runs/segment/outputs/yolo/seg_meat1/weights/best.pt")
+    ap.add_argument("--model", default="outputs/runs/yolo_s2/best.pt", help="trọng số TunaNet")
     ap.add_argument("--out", default="outputs/predictions_full")
     ap.add_argument("--conf", type=float, default=0.25)
     args = ap.parse_args()
